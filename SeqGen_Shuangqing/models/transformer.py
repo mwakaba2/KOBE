@@ -3,9 +3,10 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 import math
-import models
-from models import rnn
 import numpy as np
+import models
+import utils
+from models import rnn
 
 
 MAX_SIZE = 5000
@@ -100,11 +101,12 @@ class TransformerEncoder(nn.Module):
         self.config = config
         self.num_layers = config.enc_num_layers
 
-        self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size,
+        # HACK: 512 for word embeddings, 512 for condition embeddings
+        self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size // 2,
                                       padding_idx=padding_idx)
         if config.positional:
             self.position_embedding = PositionalEncoding(
-                config.dropout, config.emb_size)
+                config.dropout, config.emb_size // 2)
         else:
             # RNN for positional information
             self.rnn = nn.LSTM(input_size=config.emb_size, hidden_size=config.hidden_size,
@@ -117,7 +119,14 @@ class TransformerEncoder(nn.Module):
         self.padding_idx = padding_idx
 
     def forward(self, src, lengths=None):
-
+        # HACK: recover the original sentence without the condition
+        conditions = src[[length - 1 for length in lengths], range(src.shape[1])]
+        src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
+        lengths = [length - 1 for length in lengths]
+        assert all([length > 0 for length in lengths])
+        # print(conditions.shape) # batch_size
+        # print(src.shape) # max_len X batch_size
+        conditions = conditions.unsqueeze(0) # 1 X batch_size
         embed = self.embedding(src)
 
         # RNN for positional information
@@ -130,6 +139,16 @@ class TransformerEncoder(nn.Module):
                 emb[:, :, self.config.hidden_size:]
             emb = emb + embed
             state = (state[0][0], state[1][0])
+
+        assert self.config.positional
+        conditions_embed = self.embedding(conditions)
+        conditions_embed = conditions_embed.expand_as(embed)
+        # Concat
+        emb = torch.cat([emb, conditions_embed], dim=-1)
+        # Add
+        # emb = emb + conditions_embed
+        # Remove condition
+        # emb = emb
 
         out = emb.transpose(0, 1).contiguous()
         src_words = src.transpose(0, 1)
