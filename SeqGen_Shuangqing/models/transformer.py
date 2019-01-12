@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 import math
@@ -93,6 +94,36 @@ class TransformerEncoderLayer(nn.Module):
         return self.feed_forward(out)
 
 
+class BiAttention(nn.Module):
+    def __init__(self, input_size, dropout):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        self.input_linear = nn.Linear(input_size, 1, bias=False)
+        self.memory_linear = nn.Linear(input_size, 1, bias=False)
+
+        self.dot_scale = nn.Parameter(torch.Tensor(input_size).uniform_(1.0 / (input_size ** 0.5)))
+
+    def forward(self, input, memory, mask=None):
+        bsz, input_len, memory_len = input.size(0), input.size(1), memory.size(1)
+
+        input = self.dropout(input)
+        memory = self.dropout(memory)
+
+        input_dot = self.input_linear(input)
+        memory_dot = self.memory_linear(memory).view(bsz, 1, memory_len)
+        cross_dot = torch.bmm(input * self.dot_scale, memory.permute(0, 2, 1).contiguous())
+        att = input_dot + memory_dot + cross_dot
+        if mask is not None:
+            att = att - 1e30 * (1 - mask[:,None])
+
+        weight_one = F.softmax(att, dim=-1)
+        output_one = torch.bmm(weight_one, memory)
+        weight_two = F.softmax(att.max(dim=-1)[0], dim=-1).view(bsz, 1, input_len)
+        output_two = torch.bmm(weight_two, input)
+
+        return torch.cat([input, output_one, input*output_one, output_two*output_one], dim=-1)
+
+
 class TransformerEncoder(nn.Module):
 
     def __init__(self, config, padding_idx=0):
@@ -102,11 +133,11 @@ class TransformerEncoder(nn.Module):
         self.num_layers = config.enc_num_layers
 
         # HACK: 512 for word embeddings, 512 for condition embeddings
-        self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size // 2,
+        self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size,
                                       padding_idx=padding_idx)
         if config.positional:
             self.position_embedding = PositionalEncoding(
-                config.dropout, config.emb_size // 2)
+                config.dropout, config.emb_size)
         else:
             # RNN for positional information
             self.rnn = nn.LSTM(input_size=config.emb_size, hidden_size=config.hidden_size,
@@ -117,6 +148,7 @@ class TransformerEncoder(nn.Module):
              for _ in range(config.enc_num_layers)])
         self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-6)
         self.padding_idx = padding_idx
+        self.condition_context_attn = BiAttention(config.hidden_size, config.dropout)
 
     def forward(self, src, lengths=None):
         # HACK: recover the original sentence without the condition
@@ -124,11 +156,12 @@ class TransformerEncoder(nn.Module):
         src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
         lengths = [length - 1 for length in lengths]
         assert all([length > 0 for length in lengths])
-        # print(conditions.shape) # batch_size
-        # print(src.shape) # max_len X batch_size
-        conditions = conditions.unsqueeze(0) # 1 X batch_size
-        embed = self.embedding(src)
+        # batch_size X hidden_size
+        conditions_embed = self.embedding(conditions)
+        # batch_size X 1 X hidden_size
+        conditions_embed = conditions_embed.unsqueeze(1) 
 
+        embed = self.embedding(src)
         # RNN for positional information
         if self.config.positional:
             emb = self.position_embedding(embed)
@@ -139,16 +172,6 @@ class TransformerEncoder(nn.Module):
                 emb[:, :, self.config.hidden_size:]
             emb = emb + embed
             state = (state[0][0], state[1][0])
-
-        assert self.config.positional
-        conditions_embed = self.embedding(conditions)
-        conditions_embed = conditions_embed.expand_as(embed)
-        # Concat
-        emb = torch.cat([emb, conditions_embed], dim=-1)
-        # Add
-        # emb = emb + conditions_embed
-        # Remove condition
-        # emb = emb
 
         out = emb.transpose(0, 1).contiguous()
         src_words = src.transpose(0, 1)
@@ -161,7 +184,9 @@ class TransformerEncoder(nn.Module):
             out = self.transformer[i](out, mask)
         out = self.layer_norm(out)
 
+        assert self.config.positional
         if self.config.positional:
+            out = self.condition_context_attn(out, conditions_embed)
             return out.transpose(0, 1)
         else:
             return out.transpose(0, 1), state
@@ -176,14 +201,14 @@ class TransformerDecoderLayer(nn.Module):
         self.config = config
 
         self.self_attn = models.Multihead_Attention(
-            model_dim=config.hidden_size, head_count=config.heads, dropout=config.dropout)
+            model_dim=config.hidden_size * 4, head_count=config.heads, dropout=config.dropout)
 
         self.context_attn = models.Multihead_Attention(
-            model_dim=config.hidden_size, head_count=config.heads, dropout=config.dropout)
+            model_dim=config.hidden_size * 4, head_count=config.heads, dropout=config.dropout)
         self.feed_forward = PositionwiseFeedForward(
-            config.hidden_size, config.d_ff, config.dropout)
-        self.layer_norm_1 = nn.LayerNorm(config.hidden_size, eps=1e-6)
-        self.layer_norm_2 = nn.LayerNorm(config.hidden_size, eps=1e-6)
+            config.hidden_size * 4, config.d_ff, config.dropout)
+        self.layer_norm_1 = nn.LayerNorm(config.hidden_size * 4, eps=1e-6)
+        self.layer_norm_2 = nn.LayerNorm(config.hidden_size * 4, eps=1e-6)
         self.dropout = config.dropout
         self.drop = nn.Dropout(config.dropout)
         mask = self._get_attn_subsequent_mask(MAX_SIZE)
@@ -194,12 +219,12 @@ class TransformerDecoderLayer(nn.Module):
         # Add convolutional temperature for attention distribution
         if config.convolutional:
             self.self_lin = nn.Sequential(
-                nn.Linear(config.hidden_size, config.heads),
+                nn.Linear(config.hidden_size * 4, config.heads),
                 nn.ReLU(), nn.Dropout())
             self.self_ln = nn.LayerNorm(config.heads, eps=1e-6)
             self.self_sigmoid = nn.Sigmoid()
             self.ctxt_lin = nn.Sequential(
-                nn.Linear(config.hidden_size, config.heads),
+                nn.Linear(config.hidden_size * 4, config.heads),
                 nn.ReLU(), nn.Dropout(config.dropout))
             self.ctxt_ln = nn.LayerNorm(config.heads, eps=1e-6)
             self.ctxt_sigmoid = nn.Sigmoid()
@@ -264,13 +289,13 @@ class TransformerDecoder(nn.Module):
         if tgt_embedding:
             self.embedding = tgt_embedding
         else:
-            self.embedding = nn.Embedding(config.tgt_vocab_size, config.emb_size,
+            self.embedding = nn.Embedding(config.tgt_vocab_size, config.emb_size * 4,
                                           padding_idx=padding_idx)
         if config.positional:
             self.position_embedding = PositionalEncoding(
-                config.dropout, config.emb_size)
+                config.dropout, config.emb_size * 4)
         else:
-            self.rnn = nn.LSTMCell(config.emb_size, config.hidden_size)
+            self.rnn = nn.LSTMCell(config.emb_size * 4, config.hidden_size * 4)
 
         self.padding_idx = padding_idx
 
@@ -280,7 +305,7 @@ class TransformerDecoder(nn.Module):
             [TransformerDecoderLayer(config)
              for _ in range(config.dec_num_layers)])
 
-        self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-6)
+        self.layer_norm = nn.LayerNorm(config.hidden_size * 4, eps=1e-6)
 
     def init_state(self, src, memory_bank):
         self.state["src"] = src

@@ -89,7 +89,7 @@ class tensor2tensor(nn.Module):
         if config.use_cuda:
             self.criterion.cuda()
         self.compute_score = nn.Linear(
-            config.hidden_size, config.tgt_vocab_size)
+            config.hidden_size * 4, config.tgt_vocab_size)
         if config.rl:
             self.bleu_scorer = bleu.Scorer(pad=0, eos=3, unk=1)
             self.reward_provider = CTRRewardProvider(
