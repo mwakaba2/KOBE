@@ -93,8 +93,11 @@ class tensor2tensor(nn.Module):
             self.bleu_scorer = bleu.Scorer(pad=0, eos=3, unk=1)
             self.reward_provider = CTRRewardProvider(
                 config.ctr_rewared_provider_path)
-            self.tgt_vocab = tgt_vocab
+        self.tgt_vocab = tgt_vocab
         self.padding_idx = tgt_padding_idx
+        self.transform_embedding = nn.Linear(config.emb_size, config.emb_size // 2)
+        self.fact_embedding = nn.Embedding(config.tgt_vocab_size, config.emb_size // 2,
+                                           padding_idx=tgt_padding_idx)
 
     def compute_loss(self, scores, targets):
         scores = scores.contiguous().view(-1, scores.size(2))
@@ -195,7 +198,10 @@ class tensor2tensor(nn.Module):
         # MLE Loss
         outputs = []
         if self.config.positional:
-            contexts = self.encoder(src, knowledge, src_len.tolist())
+            # knowledge_embed = self.transform_embedding(self.decoder.embedding(knowledge))
+            knowledge_embed = self.fact_embedding(knowledge)
+            # knowledge_embed = self.fact_embedding(knowledge)
+            contexts = self.encoder(src, knowledge_embed, src_len.tolist())
             # mask = (knowledge != 0).float()
             # knowledge_embed = self.knowledge_embedding(knowledge)
             # contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
@@ -233,7 +239,10 @@ class tensor2tensor(nn.Module):
         knowledge = knowledge.t()
 
         if self.config.positional:
-            contexts = self.encoder(src, knowledge, src_len.tolist())
+            # knowledge_embed = self.transform_embedding(self.decoder.embedding(knowledge))
+            knowledge_embed = self.fact_embedding(knowledge)
+            contexts = self.encoder(src, knowledge_embed, src_len.tolist())
+            # contexts = self.encoder(src, knowledge, src_len.tolist())
             # mask = (knowledge != 0).float()
             # knowledge_embed = self.knowledge_embedding(knowledge)
             # contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)

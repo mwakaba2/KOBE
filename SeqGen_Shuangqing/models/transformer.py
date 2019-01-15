@@ -135,7 +135,7 @@ class TransformerEncoder(nn.Module):
         # HACK: 512 for word embeddings, 512 for condition embeddings
         self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size // 2,
                                       padding_idx=padding_idx)
-        self.word_embedding = nn.Embedding(214852, config.emb_size // 2, padding_idx=0)
+        # self.word_embedding = nn.Embedding(214852, config.emb_size // 2, padding_idx=0)
         if config.positional:
             self.position_embedding = PositionalEncoding(
                 config.dropout, config.emb_size)
@@ -152,14 +152,14 @@ class TransformerEncoder(nn.Module):
         # self.condition_context_attn = BiAttention(config.hidden_size, config.dropout)
         # self.bi_attn_control_exp = nn.Linear(config.hidden_size, config.hidden_size)
 
-    def forward(self, src, knowledge, lengths=None):
+    def forward(self, src, word_embed, lengths=None):
         # HACK: recover the original sentence (removing the condition)
         src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
         lengths = [length - 1 for length in lengths]
         assert all([length > 0 for length in lengths])
 
         embed = self.embedding(src)
-        word_embed = self.word_embedding(knowledge)
+        # word_embed = self.word_embedding(knowledge)
         embed = torch.cat([embed, word_embed], dim=-1)
         # RNN for positional information
         if self.config.positional:

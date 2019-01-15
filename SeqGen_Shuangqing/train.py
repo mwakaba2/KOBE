@@ -76,10 +76,10 @@ def load_data():
     data['train']['length'] = int(data['train']['length'] * opt.scale)
 
     trainset = utils.BiKnowledgeDataset(
-        '../data/emotion/train.matched_knowledge',
+        '../data/emotion/train.supporting_facts',
         infos=data['train'], char=config.char)
     validset = utils.BiKnowledgeDataset(
-        '../data/emotion/test.matched_knowledge',
+        '../data/emotion/test.supporting_facts',
         infos=data['test'], char=config.char)
 
     src_vocab = data['dict']['src']
