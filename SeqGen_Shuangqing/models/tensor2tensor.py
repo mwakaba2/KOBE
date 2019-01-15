@@ -88,15 +88,13 @@ class tensor2tensor(nn.Module):
             self.criterion = nn.CrossEntropyLoss(ignore_index=utils.PAD)
         if config.use_cuda:
             self.criterion.cuda()
-        self.compute_score = nn.Linear(
-            config.hidden_size * 4, config.tgt_vocab_size)
+        self.compute_score = nn.Linear(config.hidden_size, config.tgt_vocab_size)
         if config.rl:
             self.bleu_scorer = bleu.Scorer(pad=0, eos=3, unk=1)
             self.reward_provider = CTRRewardProvider(
                 config.ctr_rewared_provider_path)
             self.tgt_vocab = tgt_vocab
         self.padding_idx = tgt_padding_idx
-        self.knowledge_embedding = nn.Embedding(214852, config.emb_size, padding_idx=0)
 
     def compute_loss(self, scores, targets):
         scores = scores.contiguous().view(-1, scores.size(2))
@@ -191,15 +189,16 @@ class tensor2tensor(nn.Module):
         return_dict = {}
         src = src.t()
         dec = dec.t()
+        knowledge = knowledge.t()
         targets = targets.t()
 
         # MLE Loss
         outputs = []
         if self.config.positional:
-            contexts = self.encoder(src, src_len.tolist())
-            mask = (knowledge != 0).float()
-            knowledge_embed = self.knowledge_embedding(knowledge)
-            contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
+            contexts = self.encoder(src, knowledge, src_len.tolist())
+            # mask = (knowledge != 0).float()
+            # knowledge_embed = self.knowledge_embedding(knowledge)
+            # contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
             self.decoder.init_state(src, contexts)
             outputs, _ = self.decoder(dec, contexts)
         else:
@@ -231,12 +230,13 @@ class tensor2tensor(nn.Module):
         if self.use_cuda:
             bos = bos.cuda()
         src = src.t()
+        knowledge = knowledge.t()
 
         if self.config.positional:
-            contexts = self.encoder(src, src_len.tolist())
-            mask = (knowledge != 0).float()
-            knowledge_embed = self.knowledge_embedding(knowledge)
-            contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
+            contexts = self.encoder(src, knowledge, src_len.tolist())
+            # mask = (knowledge != 0).float()
+            # knowledge_embed = self.knowledge_embedding(knowledge)
+            # contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
         else:
             contexts, state = self.encoder(src, src_len.tolist())
 
