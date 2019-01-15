@@ -96,6 +96,7 @@ class tensor2tensor(nn.Module):
                 config.ctr_rewared_provider_path)
             self.tgt_vocab = tgt_vocab
         self.padding_idx = tgt_padding_idx
+        self.knowledge_embedding = nn.Embedding(214852, config.emb_size, padding_idx=0)
 
     def compute_loss(self, scores, targets):
         scores = scores.contiguous().view(-1, scores.size(2))
@@ -186,7 +187,7 @@ class tensor2tensor(nn.Module):
                 1).expand(-1, self.config.max_time_step).cuda()
         return batch_rewards
 
-    def forward(self, src, src_len, dec, targets, teacher_ratio=1.0):
+    def forward(self, src, src_len, dec, targets, knowledge, knowledge_len, teacher_ratio=1.0):
         return_dict = {}
         src = src.t()
         dec = dec.t()
@@ -196,6 +197,9 @@ class tensor2tensor(nn.Module):
         outputs = []
         if self.config.positional:
             contexts = self.encoder(src, src_len.tolist())
+            mask = (knowledge != 0).float()
+            knowledge_embed = self.knowledge_embedding(knowledge)
+            contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
             self.decoder.init_state(src, contexts)
             outputs, _ = self.decoder(dec, contexts)
         else:
@@ -219,7 +223,7 @@ class tensor2tensor(nn.Module):
 
         return return_dict, scores
 
-    def sample(self, src, src_len):
+    def sample(self, src, src_len, knowledge, knowledge_len):
         # lengths, indices = torch.sort(src_len, dim=0, descending=True)
         # _, reverse_indices = torch.sort(indices)
         # src = torch.index_select(src, dim=0, index=indices)
@@ -230,6 +234,9 @@ class tensor2tensor(nn.Module):
 
         if self.config.positional:
             contexts = self.encoder(src, src_len.tolist())
+            mask = (knowledge != 0).float()
+            knowledge_embed = self.knowledge_embedding(knowledge)
+            contexts = self.encoder.condition_context_attn(contexts.transpose(0, 1), knowledge_embed, mask).transpose(0, 1)
         else:
             contexts, state = self.encoder(src, src_len.tolist())
 

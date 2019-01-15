@@ -133,11 +133,11 @@ class TransformerEncoder(nn.Module):
         self.num_layers = config.enc_num_layers
 
         # HACK: 512 for word embeddings, 512 for condition embeddings
-        self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size,
+        self.embedding = nn.Embedding(config.src_vocab_size, config.emb_size // 2,
                                       padding_idx=padding_idx)
         if config.positional:
             self.position_embedding = PositionalEncoding(
-                config.dropout, config.emb_size)
+                config.dropout, config.emb_size // 2)
         else:
             # RNN for positional information
             self.rnn = nn.LSTM(input_size=config.emb_size, hidden_size=config.hidden_size,
@@ -149,6 +149,7 @@ class TransformerEncoder(nn.Module):
         self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-6)
         self.padding_idx = padding_idx
         self.condition_context_attn = BiAttention(config.hidden_size, config.dropout)
+        self.bi_attn_control_exp = nn.Linear(config.hidden_size, config.hidden_size * 4)
 
     def forward(self, src, lengths=None):
         # HACK: recover the original sentence without the condition
@@ -156,10 +157,6 @@ class TransformerEncoder(nn.Module):
         src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
         lengths = [length - 1 for length in lengths]
         assert all([length > 0 for length in lengths])
-        # batch_size X hidden_size
-        conditions_embed = self.embedding(conditions)
-        # batch_size X 1 X hidden_size
-        conditions_embed = conditions_embed.unsqueeze(1) 
 
         embed = self.embedding(src)
         # RNN for positional information
@@ -172,6 +169,9 @@ class TransformerEncoder(nn.Module):
                 emb[:, :, self.config.hidden_size:]
             emb = emb + embed
             state = (state[0][0], state[1][0])
+        conditions_embed = self.embedding(conditions.unsqueeze(0))
+        conditions_embed = conditions_embed.expand_as(embed)
+        emb = torch.cat([emb, conditions_embed], dim=-1)
 
         out = emb.transpose(0, 1).contiguous()
         src_words = src.transpose(0, 1)
@@ -186,7 +186,8 @@ class TransformerEncoder(nn.Module):
 
         assert self.config.positional
         if self.config.positional:
-            out = self.condition_context_attn(out, conditions_embed)
+            # out = self.condition_context_attn(out, conditions_embed)
+            # out = self.bi_attn_control_exp(out)
             return out.transpose(0, 1)
         else:
             return out.transpose(0, 1), state

@@ -75,8 +75,12 @@ def load_data():
     data = pickle.load(open(config.data + 'data.pkl', 'rb'))
     data['train']['length'] = int(data['train']['length'] * opt.scale)
 
-    trainset = utils.BiDataset(data['train'], char=config.char)
-    validset = utils.BiDataset(data['test'], char=config.char)
+    trainset = utils.BiKnowledgeDataset(
+        '../data/emotion/train.matched_knowledge',
+        infos=data['train'], char=config.char)
+    validset = utils.BiKnowledgeDataset(
+        '../data/emotion/test.matched_knowledge',
+        infos=data['test'], char=config.char)
 
     src_vocab = data['dict']['src']
     tgt_vocab = data['dict']['tgt']
@@ -168,7 +172,7 @@ def train_model(model, data, optim, epoch, params):
     trainloader = data['trainloader']
     log_vars = defaultdict(float)
 
-    for src, tgt, src_len, tgt_len, original_src, original_tgt in trainloader:
+    for src, tgt, src_len, tgt_len, original_src, original_tgt, knowledge, knowledge_len in trainloader:
 
         model.zero_grad()
 
@@ -176,9 +180,13 @@ def train_model(model, data, optim, epoch, params):
             src = src.cuda()
             tgt = tgt.cuda()
             src_len = src_len.cuda()
+            knowledge = knowledge.cuda()
+            knowledge_len = knowledge_len.cuda()
         lengths, indices = torch.sort(src_len, dim=0, descending=True)
         src = torch.index_select(src, dim=0, index=indices)
         tgt = torch.index_select(tgt, dim=0, index=indices)
+        knowledge = torch.index_select(knowledge, dim=0, index=indices)
+        knowledge_len = torch.index_select(knowledge_len, dim=0, index=indices)
         dec = tgt[:, :-1]
         targets = tgt[:, 1:]
 
@@ -191,7 +199,7 @@ def train_model(model, data, optim, epoch, params):
                 else:
                     return_dict, outputs = model(src, lengths, dec, targets)
             else:
-                return_dict, outputs = model(src, lengths, dec, targets)
+                return_dict, outputs = model(src, lengths, dec, targets, knowledge, knowledge_len)
             pred = outputs.max(2)[1]
             targets = targets.t()
             num_correct = pred.eq(targets).masked_select(
@@ -334,18 +342,20 @@ def eval_model(model, data, params):
     #     writer.add_scalar(
     #         "valid" + "/accuracy", eval_params['report_correct'] / eval_params['report_total'], params['updates'])
 
-    for src, tgt, src_len, tgt_len, original_src, original_tgt in validloader:
+    for src, tgt, src_len, tgt_len, original_src, original_tgt, knowledge, knowledge_len in validloader:
 
         if config.use_cuda:
             src = src.cuda()
             src_len = src_len.cuda()
+            knowledge = knowledge.cuda()
+            knowledge_len = knowledge_len.cuda()
 
         with torch.no_grad():
             if config.beam_size > 1:
                 samples, alignment, weight = model.beam_sample(
                     src, src_len, beam_size=config.beam_size, eval_=True)
             else:
-                samples, alignment = model.sample(src, src_len)
+                samples, alignment = model.sample(src, src_len, knowledge, knowledge_len)
 
         candidate += [tgt_vocab.convertToLabels(s, utils.EOS) for s in samples]
         source += original_src
