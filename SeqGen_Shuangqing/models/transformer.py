@@ -152,11 +152,12 @@ class TransformerEncoder(nn.Module):
         self.condition_context_attn = BiAttention(config.hidden_size, config.dropout)
         self.bi_attn_control_exp = nn.Linear(config.hidden_size, config.hidden_size * 4)
 
-    def forward(self, src, lengths=None):
+    def forward(self, src, lengths=None, is_fact=False):
         # HACK: recover the original sentence (removing the condition)
-        src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
-        lengths = [length - 1 for length in lengths]
-        assert all([length > 0 for length in lengths])
+        if not is_fact:
+            src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
+            lengths = [length - 1 for length in lengths]
+            assert all([length > 0 for length in lengths])
 
         embed = self.embedding(src)
         # word_embed = self.word_embedding(knowledge)

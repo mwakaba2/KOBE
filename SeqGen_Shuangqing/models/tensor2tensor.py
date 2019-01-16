@@ -70,6 +70,12 @@ class tensor2tensor(nn.Module):
         else:
             self.encoder = models.TransformerEncoder(
                 config, padding_idx=src_padding_idx)
+            # HACK: create supporting facts encoder
+            src_vocab_size = config.src_vocab_size
+            config.src_vocab_size = config.tgt_vocab_size
+            self.fact_encoder = models.TransformerEncoder(
+                config, padding_idx=src_padding_idx)
+            config.src_vocab_size = config.src_vocab_size
         tgt_embedding = self.encoder.embedding if config.shared_vocab else None
         if decoder is not None:
             self.decoder = decoder
@@ -192,19 +198,16 @@ class tensor2tensor(nn.Module):
         return_dict = {}
         src = src.t()
         dec = dec.t()
-        # knowledge = knowledge.t()
+        knowledge = knowledge.t()
         targets = targets.t()
 
         # MLE Loss
         outputs = []
         if self.config.positional:
-            # knowledge_embed = self.transform_embedding(self.decoder.embedding(knowledge))
-            mask = (knowledge != 0).float()
-            knowledge_embed = self.fact_embedding(knowledge)
-            # knowledge_embed = self.fact_embedding(knowledge)
+            mask = (knowledge.t() != 0).float()
+            knowledge_contexts = self.fact_encoder(knowledge, is_fact=True).transpose(0, 1)
             contexts = self.encoder(src, src_len.tolist()).transpose(0, 1)
-            # knowledge_embed = self.knowledge_embedding(knowledge)
-            contexts = self.encoder.condition_context_attn(contexts, knowledge_embed, mask)
+            contexts = self.encoder.condition_context_attn(contexts, knowledge_contexts, mask)
             # contexts = self.encoder.bi_attn_control_exp(contexts)
             contexts = contexts.transpose(0, 1)
             self.decoder.init_state(src, contexts)
@@ -238,16 +241,13 @@ class tensor2tensor(nn.Module):
         if self.use_cuda:
             bos = bos.cuda()
         src = src.t()
-        # knowledge = knowledge.t()
+        knowledge = knowledge.t()
 
         if self.config.positional:
-            # knowledge_embed = self.transform_embedding(self.decoder.embedding(knowledge))
-            mask = (knowledge != 0).float()
-            knowledge_embed = self.fact_embedding(knowledge)
-            # knowledge_embed = self.fact_embedding(knowledge)
+            mask = (knowledge.t() != 0).float()
+            knowledge_contexts = self.fact_encoder(knowledge, is_fact=True).transpose(0, 1)
             contexts = self.encoder(src, src_len.tolist()).transpose(0, 1)
-            # knowledge_embed = self.knowledge_embedding(knowledge)
-            contexts = self.encoder.condition_context_attn(contexts, knowledge_embed, mask)
+            contexts = self.encoder.condition_context_attn(contexts, knowledge_contexts, mask)
             # contexts = self.encoder.bi_attn_control_exp(contexts)
             contexts = contexts.transpose(0, 1)
         else:
