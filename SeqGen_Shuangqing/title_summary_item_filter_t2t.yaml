@@ -4,7 +4,7 @@ refF: ''
 tensorboard: True
 tensorboard_log_dir: 'experiments/'
 epoch: 100
-batch_size: 64
+batch_size: 48
 optim: 'adam'
 cell: 'lstm'
 attention: 'luong_gate'

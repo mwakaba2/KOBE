@@ -94,7 +94,7 @@ class tensor2tensor(nn.Module):
             self.criterion = nn.CrossEntropyLoss(ignore_index=utils.PAD)
         if config.use_cuda:
             self.criterion.cuda()
-        self.compute_score = nn.Linear(config.hidden_size * 4, config.tgt_vocab_size)
+        self.compute_score = nn.Linear(config.hidden_size, config.tgt_vocab_size)
         if config.rl:
             self.bleu_scorer = bleu.Scorer(pad=0, eos=3, unk=1)
             self.reward_provider = CTRRewardProvider(
@@ -208,6 +208,7 @@ class tensor2tensor(nn.Module):
             knowledge_contexts = self.fact_encoder(knowledge, is_fact=True).transpose(0, 1)
             contexts = self.encoder(src, src_len.tolist()).transpose(0, 1)
             contexts = self.encoder.condition_context_attn(contexts, knowledge_contexts, mask)
+            contexts = self.encoder.bi_attn_transform(contexts)
             # contexts = self.encoder.bi_attn_control_exp(contexts)
             contexts = contexts.transpose(0, 1)
             self.decoder.init_state(src, contexts)
@@ -248,6 +249,7 @@ class tensor2tensor(nn.Module):
             knowledge_contexts = self.fact_encoder(knowledge, is_fact=True).transpose(0, 1)
             contexts = self.encoder(src, src_len.tolist()).transpose(0, 1)
             contexts = self.encoder.condition_context_attn(contexts, knowledge_contexts, mask)
+            contexts = self.encoder.bi_attn_transform(contexts)
             # contexts = self.encoder.bi_attn_control_exp(contexts)
             contexts = contexts.transpose(0, 1)
         else:

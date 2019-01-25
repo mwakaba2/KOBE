@@ -150,14 +150,14 @@ class TransformerEncoder(nn.Module):
         self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-6)
         self.padding_idx = padding_idx
         self.condition_context_attn = BiAttention(config.hidden_size, config.dropout)
-        self.bi_attn_control_exp = nn.Linear(config.hidden_size, config.hidden_size * 4)
+        self.bi_attn_transform = nn.Linear(config.hidden_size * 4, config.hidden_size)
 
     def forward(self, src, lengths=None, is_fact=False):
         # HACK: recover the original sentence (removing the condition)
-        if not is_fact:
-            src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
-            lengths = [length - 1 for length in lengths]
-            assert all([length > 0 for length in lengths])
+        # if not is_fact:
+        #     src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
+        #     lengths = [length - 1 for length in lengths]
+        #     assert all([length > 0 for length in lengths])
 
         embed = self.embedding(src)
         # word_embed = self.word_embedding(knowledge)
@@ -205,14 +205,14 @@ class TransformerDecoderLayer(nn.Module):
         self.config = config
 
         self.self_attn = models.Multihead_Attention(
-            model_dim=config.hidden_size * 4, head_count=config.heads, dropout=config.dropout)
+            model_dim=config.hidden_size, head_count=config.heads, dropout=config.dropout)
 
         self.context_attn = models.Multihead_Attention(
-            model_dim=config.hidden_size * 4, head_count=config.heads, dropout=config.dropout)
+            model_dim=config.hidden_size, head_count=config.heads, dropout=config.dropout)
         self.feed_forward = PositionwiseFeedForward(
-            config.hidden_size * 4, config.d_ff, config.dropout)
-        self.layer_norm_1 = nn.LayerNorm(config.hidden_size * 4, eps=1e-6)
-        self.layer_norm_2 = nn.LayerNorm(config.hidden_size * 4, eps=1e-6)
+            config.hidden_size, config.d_ff, config.dropout)
+        self.layer_norm_1 = nn.LayerNorm(config.hidden_size, eps=1e-6)
+        self.layer_norm_2 = nn.LayerNorm(config.hidden_size, eps=1e-6)
         self.dropout = config.dropout
         self.drop = nn.Dropout(config.dropout)
         mask = self._get_attn_subsequent_mask(MAX_SIZE)
@@ -223,12 +223,12 @@ class TransformerDecoderLayer(nn.Module):
         # Add convolutional temperature for attention distribution
         if config.convolutional:
             self.self_lin = nn.Sequential(
-                nn.Linear(config.hidden_size * 4, config.heads),
+                nn.Linear(config.hidden_size, config.heads),
                 nn.ReLU(), nn.Dropout())
             self.self_ln = nn.LayerNorm(config.heads, eps=1e-6)
             self.self_sigmoid = nn.Sigmoid()
             self.ctxt_lin = nn.Sequential(
-                nn.Linear(config.hidden_size * 4, config.heads),
+                nn.Linear(config.hidden_size, config.heads),
                 nn.ReLU(), nn.Dropout(config.dropout))
             self.ctxt_ln = nn.LayerNorm(config.heads, eps=1e-6)
             self.ctxt_sigmoid = nn.Sigmoid()
@@ -293,13 +293,13 @@ class TransformerDecoder(nn.Module):
         if tgt_embedding:
             self.embedding = tgt_embedding
         else:
-            self.embedding = nn.Embedding(config.tgt_vocab_size, config.emb_size * 4,
+            self.embedding = nn.Embedding(config.tgt_vocab_size, config.emb_size,
                                           padding_idx=padding_idx)
         if config.positional:
             self.position_embedding = PositionalEncoding(
-                config.dropout, config.emb_size * 4)
+                config.dropout, config.emb_size)
         else:
-            self.rnn = nn.LSTMCell(config.emb_size * 4, config.hidden_size * 4)
+            self.rnn = nn.LSTMCell(config.emb_size, config.hidden_size)
 
         self.padding_idx = padding_idx
 
@@ -309,7 +309,7 @@ class TransformerDecoder(nn.Module):
             [TransformerDecoderLayer(config)
              for _ in range(config.dec_num_layers)])
 
-        self.layer_norm = nn.LayerNorm(config.hidden_size * 4, eps=1e-6)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-6)
 
     def init_state(self, src, memory_bank):
         self.state["src"] = src
