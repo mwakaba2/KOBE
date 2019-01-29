@@ -1,4 +1,4 @@
-data: '../data/finals/baseline/preprocessed/'
+data: '../data/finals/aspect-user/preprocessed/'
 logF: 'experiments/'
 refF: ''
 tensorboard: True

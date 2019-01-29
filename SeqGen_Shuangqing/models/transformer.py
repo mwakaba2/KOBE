@@ -158,6 +158,17 @@ class TransformerEncoder(nn.Module):
         #     src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
         #     lengths = [length - 1 for length in lengths]
         #     assert all([length > 0 for length in lengths])
+        if not is_fact:
+            conditions_1 = src[[length - 1 for length in lengths], range(src.shape[1])]
+            conditions_2 = src[[length - 2 for length in lengths], range(src.shape[1])]
+            src[[length - 1 for length in lengths], range(src.shape[1])] = utils.PAD
+            src[[length - 2 for length in lengths], range(src.shape[1])] = utils.PAD
+            lengths = [length - 2 for length in lengths]
+            assert all([length > 0 for length in lengths])
+            # print(conditions.shape) # batch_size
+            # print(src.shape) # max_len X batch_size
+            conditions_1 = conditions_1.unsqueeze(0) # 1 X batch_size
+            conditions_2 = conditions_2.unsqueeze(0) # 1 X batch_size
 
         embed = self.embedding(src)
         # word_embed = self.word_embedding(knowledge)
@@ -172,6 +183,12 @@ class TransformerEncoder(nn.Module):
                 emb[:, :, self.config.hidden_size:]
             emb = emb + embed
             state = (state[0][0], state[1][0])
+        if not is_fact:
+            conditions_1_embed = self.embedding(conditions_1)
+            conditions_1_embed = conditions_1_embed.expand_as(embed)
+            conditions_2_embed = self.embedding(conditions_2)
+            conditions_2_embed = conditions_2_embed.expand_as(embed)
+            emb += (conditions_1_embed + conditions_2_embed) / 2
         # conditions_embed = self.embedding(conditions.unsqueeze(0))
         # conditions_embed = conditions_embed.expand_as(embed)
         # emb = torch.cat([emb, conditions_embed], dim=-1)
