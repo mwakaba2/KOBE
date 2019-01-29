@@ -322,16 +322,24 @@ class tensor2tensor(nn.Module):
 
         return sample_ids
 
-    def beam_sample(self, src, src_len, beam_size=1, eval_=False):
+    def beam_sample(self, src, src_len, knowledge, beam_size=1, eval_=False):
 
         lengths, indices = torch.sort(src_len, dim=0, descending=True)
         _, ind = torch.sort(indices)
         src = torch.index_select(src, dim=0, index=indices)
         src = src.t()
+        knowledge = knowledge.t()
         batch_size = src.size(1)
 
         if self.config.positional:
-            contexts = self.encoder(src, lengths.tolist())
+            mask = (knowledge.t() != 0).float()
+            knowledge_contexts = self.fact_encoder(knowledge, is_fact=True).transpose(0, 1)
+            contexts = self.encoder(src, src_len.tolist()).transpose(0, 1)
+            contexts = self.encoder.condition_context_attn(contexts, knowledge_contexts, mask)
+            contexts = self.encoder.bi_attn_transform(contexts)
+            # contexts = self.encoder.bi_attn_control_exp(contexts)
+            contexts = contexts.transpose(0, 1)
+            # contexts = self.encoder(src, lengths.tolist())
         else:
             contexts, state = self.encoder(src, lengths.tolist())
 

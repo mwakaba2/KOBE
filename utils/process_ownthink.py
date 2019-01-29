@@ -89,7 +89,7 @@ if __name__ == "__main__":
             instance_tgts = f.read().strip().split('\n')
         with open(os.path.join(args.instance_path, split + '.supporting_facts'), 'w') as f, open(os.path.join(args.instance_path, split + '.supporting_facts_str'), 'w') as f_str:
             for src, tgt, hashid in tqdm(zip(instance_srcs, instance_tgts, instances_hashids)):
-                if src != "" and tgt != "":
+                if src != "" and tgt != "" and len(src.split()) <= 100 and len(tgt.split()) <= 150:
                     sampled_list = sample_supporting_fact(item_to_node_list[hashid]) 
                     for sampled in sampled_list:
                         f.write(' '.join(map(str, abstract_id[sampled])) + ' ')

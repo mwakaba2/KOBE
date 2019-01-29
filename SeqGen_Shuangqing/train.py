@@ -353,7 +353,7 @@ def eval_model(model, data, params):
         with torch.no_grad():
             if config.beam_size > 1:
                 samples, alignment, weight = model.beam_sample(
-                    src, src_len, beam_size=config.beam_size, eval_=True)
+                    src, src_len, knowledge, beam_size=config.beam_size, eval_=True)
             else:
                 samples, alignment = model.sample(src, src_len, knowledge, knowledge_len)
 
