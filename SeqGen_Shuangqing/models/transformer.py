@@ -151,6 +151,7 @@ class TransformerEncoder(nn.Module):
         self.padding_idx = padding_idx
         self.condition_context_attn = BiAttention(config.hidden_size, config.dropout)
         self.bi_attn_transform = nn.Linear(config.hidden_size * 4, config.hidden_size)
+        self.embed_transform = nn.Linear(config.emb_size * 2, config.emb_size)
 
     def forward(self, src, lengths=None, is_fact=False):
         # HACK: recover the original sentence (removing the condition)
@@ -188,7 +189,9 @@ class TransformerEncoder(nn.Module):
             conditions_1_embed = conditions_1_embed.expand_as(embed)
             conditions_2_embed = self.embedding(conditions_2)
             conditions_2_embed = conditions_2_embed.expand_as(embed)
-            emb += (conditions_1_embed + conditions_2_embed) / 2
+            emb = torch.cat([emb, (conditions_1_embed + conditions_2_embed) / 2], dim=-1)
+            emb = self.embed_transform(emb)
+            # emb += (conditions_1_embed + conditions_2_embed) / 2
         # conditions_embed = self.embedding(conditions.unsqueeze(0))
         # conditions_embed = conditions_embed.expand_as(embed)
         # emb = torch.cat([emb, conditions_embed], dim=-1)
