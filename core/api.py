@@ -96,7 +96,7 @@ class DescriptionGeneratorProxy(object):
         self.stdout_reader_process.start()
 
     def send(self, src):
-        self.process.stdin.write(f"{src}\n")
+        self.process.stdin.write(src + "\n")
         self.process.stdin.flush()
 
     def recv(self, timeout=None):
@@ -140,10 +140,10 @@ class DescriptionGeneratorMultiprocessing(object):
 
 if __name__ == "__main__":
     g = DescriptionGenerator(
-        config="yaml/title_summary_item_filter_t2t.yaml",
-        gpus="0",
+        config="/home/jupyter/KOBE/configs/baseline.yaml",
+        gpu="0",
         restore=False,
-        pretrain="experiments/3.8-finetune-big/best_bleu_checkpoint.pt",
+        pretrain="/home/jupyter/KOBE/experiments/baseline/best_bleu_checkpoint.pt",
         mode="eval",
         batch_size=1,
         beam_size=10,
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         model="tensor2tensor",
     )
     # For testing
-    print("".join(g.predict(list("这东西真智障"))))
+    print("".join(g.predict(list("Pink Ipad"))))
     # Interactive interface for multiprocessing
     print("COMPLETE")
     while True:
