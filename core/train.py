@@ -168,7 +168,7 @@ def train_model(model, data, optim, epoch, params, config, device, writer):
 
             for key in return_dict:
                 writer.add_scalar(
-                    f"train/{key}",
+                    "train/" + key,
                     log_vars[key] / config.report_interval,
                     params["updates"],
                 )
@@ -281,7 +281,7 @@ def eval_model(model, data, params, config, device, writer):
         os.path.join(params["log_path"], "candidate.txt"), "w+", "utf-8"
     ) as f:
         for i in range(len(candidate)):
-            f.write(f"{' '.join(candidate[i])}\n")
+            f.write(' '.join(candidate[i]) + "\n")
     if config.label_dict_file != "":
         results = utils.eval_metrics(
             reference, candidate, label_dict, params["log_path"]

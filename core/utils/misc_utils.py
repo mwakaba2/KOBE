@@ -35,10 +35,10 @@ def set_tensorboard(config):
         os.makedirs(summary_dir)
     for file_name in os.listdir(summary_dir):
         if file_name.startswith("events.out.tfevents"):
-            print(f"Event file {file_name} already exists")
+            print('Event file ' + file_name + 'already exists')
             if input("Remove this file? (y/n) ") == "y":
                 os.remove(os.path.join(summary_dir, file_name))
-                print(f"Event file {file_name} removed")
+                print('Event file ' + file_name + ' removed')
     return SummaryWriter(summary_dir)
 
 
