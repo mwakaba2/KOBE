@@ -15,6 +15,27 @@ from train import build_model
 from utils import misc_utils
 
 
+def get_args():
+    parser = ArgumentParser()
+    parser.add_argument('--config', default='default.yaml', type=str,
+                        help="config file")
+    parser.add_argument('--test-src-file', type=str,
+                        help="test source file")
+    parser.add_argument('--prediction-file', type=str,
+                        help="prediction output file")
+    parser.add_argument('--gpu', default=0, type=int,
+                        help="Use CUDA on the device.")
+    parser.add_argument('--restore', default=False, type=bool,
+                        help="restore checkpoint")
+    parser.add_argument('--pretrain', type=str,
+                        help="load pretrain encoder")
+    parser.add_argument('--batch-size', default=64, type=int)
+    parser.add_argument('--beam-size', default=1, type=int)
+    parser.add_argument('--use-cuda', action='store_true',
+                        help="save individual checkpoint")
+    parser.add_argument('--model', default='tensor2tensor', type=str)
+    
+    
 class DescriptionGenerator(object):
     def __init__(self, config, **opt):
         # Load config used for training and merge with testing options
@@ -139,25 +160,32 @@ class DescriptionGeneratorMultiprocessing(object):
 
 
 if __name__ == "__main__":
-    g = DescriptionGenerator(
-        config="/home/jupyter/KOBE/configs/baseline.yaml",
-        gpu="0",
-        restore=False,
-        pretrain="/home/jupyter/KOBE/experiments/baseline/best_bleu_checkpoint.pt",
-        mode="eval",
-        batch_size=1,
-        beam_size=10,
-        # refactor issue; workaround; delete afterwards:
+    args = get_args()
+    
+    generator = DescriptionGenerator(
+        config=args.config,
+        gpu=args.gpu,
+        restore=args.restore,
+        pretrain=args.pretrain,
+        mode=args.mode,
+        batch_size=args.batch_size,
+        beam_size=args.beam_size,
         scale=1,
         char=False,
-        use_cuda=True,
+        use_cuda=args.use_cuda,
         seed=1234,
-        model="tensor2tensor",
+        model=args.model,
     )
-    # For testing
-    print("".join(g.predict(list("Pink Ipad"))))
-    # Interactive interface for multiprocessing
-    print("COMPLETE")
-    while True:
-        src = input()
-        print("".join(g.predict(list(src))))
+    
+    src_file = args.test_src_file
+    prediction_file = args.prediction_file
+    predictions = []
+    
+    with open(src_file, 'r') as f:
+        src_text = list(f.readline())
+        prediction = generator.predict(src_text)
+        predictions.append(prediction)
+        
+    with open(prediction_file, 'w') as f:
+        for pred in predictions:
+            f.write("%s\n" % pred)
