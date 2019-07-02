@@ -23,9 +23,11 @@ def get_args():
                         help="test source file")
     parser.add_argument('--prediction-file', type=str,
                         help="prediction output file")
+    parser.add_argument('--mode', default='eval', type=str,
+                        help="Mode selection")
     parser.add_argument('--gpu', default=0, type=int,
                         help="Use CUDA on the device.")
-    parser.add_argument('--restore', default=False, type=bool,
+    parser.add_argument('--restore', action='store_true',
                         help="restore checkpoint")
     parser.add_argument('--pretrain', type=str,
                         help="load pretrain encoder")
@@ -34,6 +36,8 @@ def get_args():
     parser.add_argument('--use-cuda', action='store_true',
                         help="save individual checkpoint")
     parser.add_argument('--model', default='tensor2tensor', type=str)
+    return parser.parse_args()
+
     
     
 class DescriptionGenerator(object):
@@ -64,8 +68,10 @@ class DescriptionGenerator(object):
         with torch.no_grad():
 
             if self.config.beam_size > 1:
+                # TODO Fix later when using knowledge.
                 samples, alignments = self.model.beam_sample(
-                    src, src_len, beam_size=self.config.beam_size, eval_=False
+                    src, src_len, knowledge=self.config.knowledge, 
+                    knowledge_len=0, beam_size=self.config.beam_size, eval_=False
                 )
             else:
                 samples, alignments = self.model.sample(src, src_len)
@@ -182,9 +188,10 @@ if __name__ == "__main__":
     predictions = []
     
     with open(src_file, 'r') as f:
-        src_text = list(f.readline())
-        prediction = generator.predict(src_text)
-        predictions.append(prediction)
+        for line in f:
+            src_text = list(line)
+            prediction = ''.join(generator.predict(src_text))
+            predictions.append(prediction)
         
     with open(prediction_file, 'w') as f:
         for pred in predictions:
