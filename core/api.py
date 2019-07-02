@@ -81,6 +81,7 @@ class DescriptionGenerator(object):
 
         # Replace unk with src tokens
         if self.config.unk and self.config.attention != "None":
+            #TODO remove source text in the final output
             s = original_src
             c = candidates[0]
             align = alignments[0]
@@ -189,8 +190,8 @@ if __name__ == "__main__":
     
     with open(src_file, 'r') as f:
         for line in f:
-            src_text = list(line)
-            prediction = ''.join(generator.predict(src_text))
+            src_text = [line]
+            prediction = ' '.join(generator.predict(src_text))
             predictions.append(prediction)
         
     with open(prediction_file, 'w') as f:
