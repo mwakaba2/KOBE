@@ -1,8 +1,9 @@
-### Train Command ###
-# python3.5 core/train.py --config '/home/jupyter/KOBE/configs/baseline.yaml' --expname baseline --batch-size 32
+### Train command ###
+# python3.5 core/train.py --config '/home/jupyter/KOBE/configs/baseline_large_part_2.yaml' --expname baseline_large --batch-size 32 --restore '/home/jupyter/KOBE/experiments/baseline_large/best_bleu_checkpoint.pt'
+
 
 # Data
-data: '/home/jupyter/data/baseline/preprocessed/'
+data: '/home/jupyter/data/baseline_large/preprocessed/'
 max_time_step: 150
 shared_vocab: False
 unk: True
@@ -12,15 +13,15 @@ refF: ''
 
 
 # Logging
-logdir: 'experiments/'
+logdir: '/home/jupyter/KOBE/experiments/'
 report_interval: 100
-eval_interval: 5000
-save_interval: 5000
+eval_interval: 10000
+save_interval: 10000
 metrics: ['bleu']
 
 
 # Optimization
-epoch: 8
+epoch: 10
 optim: 'adam'
 learning_rate: 2
 learning_rate_decay: 0.95
