@@ -1,6 +1,6 @@
-# python3.5 core/preprocess.py --load_data '/home/jupyter/data/baseline_large/unpreprocessed/' \
-# --save_data '/home/jupyter/data/baseline_large/preprocessed/' --src_filter 100 \
-# --tgt_filter 150 --freq 4
+# python3.5 core/preprocess.py --load_data '/home/jupyter/data/baseline_large_2/unpreprocessed/' \
+# --save_data '/home/jupyter/data/baseline_large_2/preprocessed/' --src_filter 25 \
+# --tgt_filter 70 --freq 4
 
 ### Train command ###
 # python3.5 core/train.py --config '/home/jupyter/KOBE/configs/baseline_large_2.yaml' --expname baseline_large_2 --batch-size 32
@@ -8,7 +8,7 @@
 
 # Data
 data: '/home/jupyter/data/baseline_large_2/preprocessed/'
-max_time_step: 150
+max_time_step: 70
 shared_vocab: False
 unk: True
 label_smoothing: 0.1
@@ -25,7 +25,7 @@ metrics: ['bleu', 'rouge']
 
 
 # Optimization
-epoch: 20
+epoch: 8
 optim: 'adam'
 learning_rate: 2
 learning_rate_decay: 0.95
