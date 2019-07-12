@@ -155,16 +155,16 @@ def train_model(model, data, optim, epoch, params, config, device, writer):
         params["updates"] += 1
 
         if params["updates"] % config.report_interval == 0:
-            # print(
-            #     "epoch: %3d, loss: %6.3f, time: %6.3f, updates: %8d, accuracy: %2.2f\n"
-            #     % (
-            #         epoch,
-            #         params["report_total_loss"] / config.report_interval,
-            #         time.time() - params["report_time"],
-            #         params["updates"],
-            #         params["report_correct"] * 100.0 / params["report_total"],
-            #     )
-            # )
+            print(
+                "epoch: %3d, loss: %6.3f, time: %6.3f, updates: %8d, accuracy: %2.2f\n"
+                % (
+                    epoch,
+                    params["report_total_loss"] / config.report_interval,
+                    time.time() - params["report_time"],
+                    params["updates"],
+                    params["report_correct"] * 100.0 / params["report_total"],
+                )
+            )
 
             for key in return_dict:
                 writer.add_scalar(
