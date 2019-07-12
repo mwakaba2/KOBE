@@ -2,7 +2,9 @@ import math
 import multiprocessing
 import os
 import queue
+import statistics
 import subprocess
+import time
 from argparse import ArgumentParser, Namespace
 
 import torch
@@ -38,8 +40,8 @@ def get_args():
     parser.add_argument('--model', default='tensor2tensor', type=str)
     return parser.parse_args()
 
-    
-    
+
+
 class DescriptionGenerator(object):
     def __init__(self, config, **opt):
         # Load config used for training and merge with testing options
@@ -70,7 +72,7 @@ class DescriptionGenerator(object):
             if self.config.beam_size > 1:
                 # TODO Fix later when using knowledge.
                 samples, alignments = self.model.beam_sample(
-                    src, src_len, knowledge=self.config.knowledge, 
+                    src, src_len, knowledge=self.config.knowledge,
                     knowledge_len=0, beam_size=self.config.beam_size, eval_=False
                 )
             else:
@@ -168,7 +170,7 @@ class DescriptionGeneratorMultiprocessing(object):
 
 if __name__ == "__main__":
     args = get_args()
-    
+
     generator = DescriptionGenerator(
         config=args.config,
         gpu=args.gpu,
@@ -183,17 +185,26 @@ if __name__ == "__main__":
         seed=1234,
         model=args.model,
     )
-    
+
     src_file = args.test_src_file
     prediction_file = args.prediction_file
     predictions = []
-    
+
+    pred_times = []
+
     with open(src_file, 'r') as f:
         for line in f:
             src_text = [line]
-            prediction = ' '.join(generator.predict(src_text))
+            start = time.time()
+            pred = generator.predict(src_text)
+            end = time.time()
+            pred_times.append(end - start)
+            prediction = ' '.join().replace('\n', ' ')
             predictions.append(prediction)
-        
+
     with open(prediction_file, 'w') as f:
         for pred in predictions:
             f.write("%s\n" % pred)
+
+    average_pred_time = statistics.mean(pred_times)
+    print("Average Prediction Time Mean:", average_pred_time)
