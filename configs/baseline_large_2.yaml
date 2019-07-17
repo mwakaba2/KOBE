@@ -21,7 +21,7 @@ logdir: '/home/jupyter/KOBE/experiments/'
 report_interval: 100
 eval_interval: 10000
 save_interval: 10000
-metrics: ['bleu', 'rouge']
+metrics: ['bleu']
 
 
 # Optimization

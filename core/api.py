@@ -199,7 +199,7 @@ if __name__ == "__main__":
             pred = generator.predict(src_text)
             end = time.time()
             pred_times.append(end - start)
-            prediction = ' '.join().replace('\n', ' ')
+            prediction = ' '.join(pred).replace('\n', ' ')
             predictions.append(prediction)
 
     with open(prediction_file, 'w') as f:

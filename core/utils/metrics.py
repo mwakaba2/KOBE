@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import subprocess
+import shutil
 
 import numpy as np
 from sklearn import metrics
@@ -106,6 +107,11 @@ def rouge(reference, candidate, log_path, print_log, config):
             f.write(" ".join(candidate[i]).replace(
                 ' <\s> ', '\n').replace('<unk>', 'UNK') + '\n')
 
+    try:
+        shutil.rmtree(ref_dir + '.ipynb_checkpoints/')
+        shutil.rmtree(cand_dir + '.ipynb_checkpoints/')
+    except FileNotFoundError:
+        pass
     # use pyrouge and ROUGE155
     r = pyrouge.Rouge155()
     r.model_filename_pattern = '#ID#_reference.txt'
