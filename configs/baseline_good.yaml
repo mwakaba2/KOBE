@@ -5,6 +5,12 @@
 ### Train command ###
 # python3.5 core/train.py --config '/home/jupyter/KOBE/configs/baseline_good.yaml' --expname baseline_good --batch-size 32
 
+### Test prediction with beam search ###
+# python3.5 core/api.py --config '/home/jupyter/KOBE/configs/baseline_good.yaml' \
+# --test-src-file '/home/jupyter/data/baseline_good/preprocessed/test.src.str' \
+# --prediction-file '/home/jupyter/data/baseline_good/test_prediction.txt' --mode eval \
+# --pretrain '/home/jupyter/KOBE/experiments/baseline_good/best_bleu_checkpoint.pt' \
+# --batch-size 32 --beam-size 10 --use-cuda
 
 # Data
 data: '/home/jupyter/data/baseline_good/preprocessed/'
